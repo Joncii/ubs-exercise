@@ -21,13 +21,21 @@ public class PeopleSaveService {
 	}
 	
 	public void save(List<People> people, Predicate<People> filter){
+		save(filter(people, filter));
+	}
+	
+	private List<People> filter(List<People> people, Predicate<People> filter){
 		List<People> filteredPeople = new ArrayList<>();
-		for(People person : people){
-			if(filter.apply(person)){
-				filteredPeople.add(person);
+		if(filter != null){			
+			for(People person : people){
+				if(filter.apply(person)){
+					filteredPeople.add(person);
+				}
 			}
+		} else {
+			filteredPeople = people;
 		}
-		peopleDao.savePeople(filteredPeople);
+		return filteredPeople;
 	}
 	
 }

@@ -1,13 +1,16 @@
 package ubs.exercise.service;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.joda.time.LocalDateTime;
+import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,49 +23,33 @@ public class CSVPeopleReaderService {
 
 	private static final Logger LOG = LoggerFactory.getLogger(CSVPeopleReaderService.class);
 	private static final String CSV_PEOPLE_PATH_PROPERTY = "CSV.PEOPLE.PATH";
-	private static final String CSV_SPLIT_REGEX = "\\s*,\\s*";
+	private static final String PROPERTY_PATH = "people.properties";
+
 	@Autowired
 	private PropertyReaderService propertyReaderService;
-	private List<People> people;
+	
+	@Autowired
+	private AgeConverterService ageConverterService;
 	
 	public List<People> parse(){
-		people = new ArrayList<>();
-		Properties peopleProperties = propertyReaderService.read("people.properties");
+		Properties peopleProperties = propertyReaderService.read(PROPERTY_PATH);
 		String peoplePath = peopleProperties.getProperty(CSV_PEOPLE_PATH_PROPERTY);
-		if(peoplePath != null){
-			try(BufferedReader csvReader = new BufferedReader(new FileReader(peoplePath))){
-				String csvLine;
-				int lineCount  = 0;
-				while((csvLine = csvReader.readLine()) != null){
-					lineCount++;
-					readLine(csvLine, lineCount);
-				}
-			} catch (FileNotFoundException e) {
-				LOG.error("Provided file ("+ peoplePath +") cannot be found.");
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-		} else {
-			LOG.error("Property CSV.PEOPLE.PATH is not provided. Cannot parse CSV file.");			
-		}
-		return people;
-	}
-	
-	private void readLine(String csvLine, int lineCount) {
-		if(csvLine != null){
-			String[] splitLine = csvLine.split(CSV_SPLIT_REGEX);
-			if(splitLine.length < 5){
-				LOG.warn("Line " + lineCount + " cannot be parsed.");
-			} else {
+		List<People> people = new ArrayList<>();
+		try {
+			CSVParser parse = CSVFormat.EXCEL.withFirstRecordAsHeader().parse(new FileReader(peoplePath));
+			for(CSVRecord record : parse.getRecords()){
 				People person = new People();
-				person.setFirstName(splitLine[0].trim());
-				person.setLastName(splitLine[1].trim());
-				person.setAge(Integer.valueOf(splitLine[2].trim()));
-				person.setPlaceOfBirth(splitLine[3].trim());
-				person.setProfession(splitLine[4].trim());
+				person.setFirstName(record.get(0).trim());
+				person.setLastName(record.get(1).trim());
+				person.setAge(ageConverterService.convert(LocalDateTime.parse(record.get(2).trim(), DateTimeFormat.forPattern("YYYY.MM.dd"))));
+				person.setPlaceOfBirth(record.get(3).trim());
+				person.setProfession(record.get(4).trim());
 				people.add(person);
 			}
+		} catch (IOException e) {
+			LOG.error("Cannot read csv file. Embedded exception: " + e.getMessage());
 		}
+		return people;
 	}
 
 }
